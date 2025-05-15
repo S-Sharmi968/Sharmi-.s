@@ -1,0 +1,178 @@
+# %% [markdown]
+# # Adv anced Fake News Detection using Natural Language Processing
+
+# %% [markdown]
+# This notebook demonstrates a basic approach to building a fake news detection model using NLP techniques.
+
+# %% [markdown]
+# ## 1. Setup and Imports
+
+# %%
+import pandas as pd
+import numpy as np
+from sklearn.model_selection import train_test_split
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.linear_model import LogisticRegression
+from sklearn.metrics import accuracy_score, classification_report
+import re
+import nltk
+from nltk.corpus import stopwords
+from nltk.stem import PorterStemmer
+
+# Download necessary NLTK data (run this cell once)
+nltk.download('stopwords')
+nltk.download('punkt')
+
+# %% [markdown]
+# ## 2. Data Loading and Exploration
+
+# %% [markdown]
+# **Note:** You'll need to replace `'your_dataset.csv'` with the path to your fake news dataset. Ensure your dataset has columns for the text content and a label (e.g., 'text' and 'label').
+
+# %%
+# Load your dataset
+try:
+    df = pd.read_csv('your_dataset.csv')
+    print("Dataset loaded successfully.")
+    print("Dataset shape:", df.shape)
+    print("Dataset columns:", df.columns)
+    print("First 5 rows:")
+    display(df.head())
+except FileNotFoundError:
+    print("Error: Dataset file not found. Please update the file path.")
+
+# Assuming your dataset has 'text' and 'label' columns
+# Adjust column names if necessary
+text_column = 'text'
+label_column = 'label'
+
+if text_column not in df.columns or label_column not in df.columns:
+    print(f"Error: Dataset must contain '{text_column}' and '{label_column}' columns.")
+    # Handle the error or exit
+
+# Check label distribution
+if label_column in df.columns:
+    print("\nLabel distribution:")
+    display(df[label_column].value_counts())
+
+# %% [markdown]
+# ## 3. Text Preprocessing
+
+# %%
+def preprocess_text(text):
+    if isinstance(text, str):
+        # Convert to lowercase
+        text = text.lower()
+        # Remove non-alphanumeric characters and punctuation
+        text = re.sub(r'[^a-z0-9\s]', '', text)
+        # Tokenization
+        tokens = text.split()
+        # Remove stop words
+        stop_words = set(stopwords.words('english'))
+        tokens = [word for word in tokens if word not in stop_words]
+        # Stemming (or Lemmatization)
+        stemmer = PorterStemmer()
+        tokens = [stemmer.stem(word) for word in tokens]
+        # Join tokens back into a string
+        return ' '.join(tokens)
+    else:
+        return "" # Return empty string for non-string types
+
+# Apply preprocessing to the text column
+if text_column in df.columns:
+    df['processed_text'] = df[text_column].apply(preprocess_text)
+    print("\nText preprocessing complete.")
+    display(df.head())
+
+# %% [markdown]
+# ## 4. Feature Extraction
+
+# %% [markdown]
+# Using TF-IDF as a simple feature extraction method. You can explore more advanced techniques like Word Embeddings or transformer-based models here.
+
+# %%
+if 'processed_text' in df.columns and label_column in df.columns:
+    X = df['processed_text']
+    y = df[label_column]
+
+    # Split data into training and testing sets
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+
+    print("\nData split into training and testing sets.")
+    print("Training set size:", len(X_train))
+    print("Testing set size:", len(X_test))
+
+    # Initialize TF-IDF Vectorizer
+    tfidf_vectorizer = TfidfVectorizer(max_features=5000) # You can adjust max_features
+
+    # Fit and transform the training data
+    X_train_tfidf = tfidf_vectorizer.fit_transform(X_train)
+
+    # Transform the testing data
+    X_test_tfidf = tfidf_vectorizer.transform(X_test)
+
+    print("\nTF-IDF feature extraction complete.")
+    print("Shape of X_train_tfidf:", X_train_tfidf.shape)
+    print("Shape of X_test_tfidf:", X_test_tfidf.shape)
+
+# %% [markdown]
+# ## 5. Model Training
+
+# %% [markdown]
+# Using Logistic Regression as a baseline model. Consider exploring more complex models like Support Vector Machines, Random Forests, or deep learning models for advanced detection.
+
+# %%
+if 'X_train_tfidf' in locals() and 'y_train' in locals():
+    # Initialize and train the model
+    model = LogisticRegression()
+    model.fit(X_train_tfidf, y_train)
+
+    print("\nModel training complete.")
+
+# %% [markdown]
+# ## 6. Model Evaluation
+
+# %%
+if 'model' in locals() and 'X_test_tfidf' in locals() and 'y_test' in locals():
+    # Make predictions on the test set
+    y_pred = model.predict(X_test_tfidf)
+
+    # Evaluate the model
+    accuracy = accuracy_score(y_test, y_pred)
+    report = classification_report(y_test, y_pred)
+
+    print("\nModel Evaluation:")
+    print("Accuracy:", accuracy)
+    print("\nClassification Report:")
+    print(report)
+
+# %% [markdown]
+# ## 7. Making Predictions on New Data
+
+# %% [markdown]
+# This section shows how to use your trained model to predict whether a new piece of text is fake or real.
+
+# %%
+if 'model' in locals() and 'tfidf_vectorizer' in locals():
+    def predict_fake_news(text):
+        # Preprocess the input text
+        processed_text = preprocess_text(text)
+        # Transform the processed text using the trained TF-IDF vectorizer
+        text_tfidf = tfidf_vectorizer.transform([processed_text])
+        # Make a prediction
+        prediction = model.predict(text_tfidf)
+        # Return the prediction (e.g., 0 for real, 1 for fake, depending on your labels)
+        return prediction[0]
+
+    # Example usage:
+    new_article_text = "This is a sample news article that you want to classify."
+    prediction = predict_fake_news(new_article_text)
+
+    print(f"\nPrediction for the new article: {prediction}")
+
+    # You would interpret the prediction based on how your labels are encoded.
+    # For example, if 0 is real and 1 is fake:
+    if prediction == 0:
+        print("Predicted as: Real News")
+    else: # Adjust this condition based on your label encoding
+        print("Predicted as: Fake News")
